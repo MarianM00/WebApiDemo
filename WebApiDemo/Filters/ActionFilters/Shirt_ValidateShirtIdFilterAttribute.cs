@@ -1,12 +1,18 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
-using WebApiDemo.Models.Repositories;
+using WebApiDemo.Data;
 
 namespace WebApiDemo.Filters.ActionFilters
 {
     public class Shirt_ValidateShirtIdFilterAttribute : ActionFilterAttribute
     {
-        override public void OnActionExecuting(ActionExecutingContext context)
+        private readonly ApplicationDbContext _dbContext;
+
+        public Shirt_ValidateShirtIdFilterAttribute(ApplicationDbContext dbContext)
+        {
+            _dbContext = dbContext;
+        }
+        public override void OnActionExecuting(ActionExecutingContext context)
         {
             base.OnActionExecuting(context);
 
@@ -23,14 +29,25 @@ namespace WebApiDemo.Filters.ActionFilters
                     };
                     context.Result = new BadRequestObjectResult(problemDetails);
                 }
-                else if (!ShirtRepository.ShirtExists(shirtId.Value))
+                else
                 {
-                    context.ModelState.AddModelError("ShirtId", "Shirt doesn't exist");
-                    var problemDetails = new ValidationProblemDetails(context.ModelState)
+                    var shirt = _dbContext.Shirts.Find(shirtId.Value);
+
+                    if (shirt == null)
                     {
-                        Status = StatusCodes.Status404NotFound
-                    };
-                    context.Result = new NotFoundObjectResult(problemDetails);
+
+                        context.ModelState.AddModelError("ShirtId", "Shirt doesn't exist");
+                        var problemDetails = new ValidationProblemDetails(context.ModelState)
+                        {
+                            Status = StatusCodes.Status404NotFound
+                        };
+                        context.Result = new NotFoundObjectResult(problemDetails);
+                    }
+                    else
+                    {
+                        context.HttpContext.Items["shirt"] = shirt;
+                    }
+
                 }
             }
         }
